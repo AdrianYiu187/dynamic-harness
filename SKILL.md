@@ -4,10 +4,10 @@ description: 統一任務路由器 v1.6 — 跨 5 個 domain 的 meta-dispatcher
 category: tooling
 tags: [router, dynamic, harness, dispatcher, ft-team-agent, stock-team-agent, coding-team-agent, llm-judge, multi-route, sqlite, integration, general-fallback, web-search, tavily, firecrawl, retention, cache, production, metrics, cost-tracking, plan-in-code, plan-ui, verifier, template-library, dag-visualization, independent-skill]
 created: 2026-06-05
-version: 1.6.0
+version: 1.6.1
 ---
 
-# Dynamic Harness v1.6 — Independent Skill, production-ready with Observability
+# Dynamic Harness v1.6.1 — CI 全綠 + 5 個新 pitfall
 
 > 5 個 domain、19 個功能、99/99 測試通過（0 個測試警告）。**已升級為獨立 skill**（不再依附 `hermes-agent`）— 2026-06-05。
 
@@ -470,7 +470,69 @@ v1.6 Makefile 初版 `make smoke` 寫了 `$(PYTHON) unified_router.py --version`
 - 任何 Makefile target / smoke test / CI 腳本要驗版本，**必須呼叫 `./bin/dh --version`**，不能 `python3 unified_router.py --version`
 - 推論：以後新增 CLI flags 時，**只有真正寫進 argparse 才算「公開 API」**；shell wrapper 處理的（如 `--version`）要在 SKILL.md 註明，否則 smoke/lint 會誤判
 
-**驗證**：`make smoke` 第一行應該輸出 `→ version (via bin/dh wrapper)` + `1.6.0`，不是 `unrecognized arguments: --version`。
+**驗證**：`make smoke` 第一行應該輸出 `→ version (via bin/dh wrapper)` + `1.6.1`，不是 `unrecognized arguments: --version`。
+
+### 22. `mandoc -Tlint` 連 STYLE warning 都 exit 1 — 不要無腦加進 CI
+`mandoc -Tlint` 對 lint finding 的嚴格度比想像中高：**WARNING** 與 **STYLE** 等級都會讓 exit code = 1，CI workflow 用 `mandoc -man -Tlint bin/dh.1` 當 step 就會整個 fail。常見觸發：
+- 文字行 > 80 bytes（STYLE: input text line longer than 80 bytes）
+- `.PP` macro 接在 `.SS` 後面（WARNING: skipping paragraph macro: PP after SS）
+- 連續空行、縮排不一致
+
+**預防**：
+- 寫完 man page **先在本地** `mandoc -man -Tlint bin/dh.1; echo $?` 確認 exit 0
+- 文字行保持 ≤80 bytes；長的 option 描述斷成多行或用 `.nf` 程式碼區塊包
+- 不要在 `.SS` 後面加 `.PP`（`.SS` 自己就開始新 paragraph block）
+- 如果一定要接受 STYLE 級別：workflow 改 `mandoc -Tlint bin/dh.1 | grep -v STYLE || true`（不推薦，會掩蓋真問題）
+
+**驗證**：在 v1.6.1 commit `0cc3649` 之前，`bin/dh.1` 同時有 6 處 `.PP` after `.SS`（WARNING 等級）+ 1 處 81-byte 行（STYLE 等級），都會讓 lint exit 1。
+
+### 23. shellcheck SC2086 — `$(...)` 內的變數也要加引號
+`scripts/install.sh:57` 的 `[[ ":MANPATH:" != *":$(dirname $MANDIR):"* ]]` 看起來很安全（路徑不會有空白），但 shellcheck SC2086 仍報 warning（info level），預設 CI 對所有 finding 都 fail。修正：把 `$(dirname $MANDIR)` 改成 `$(dirname "$MANDIR")`。**不要圖省事把 SC2086 disable**（`-e SC2086`）— 它會在 `MANDIR` 真的含空白時默默爆。
+
+**預防**：
+- shell script 一寫完就跑 `shellcheck scripts/*.sh bin/dh`，exit 0 才能 commit
+- `$(...)` 內的變數一律 `"$VAR"`（即使路徑也不省）
+- CI 用 `shellcheck bin/dh scripts/*.sh` 當 blocking step，不要 `|| true`
+
+### 24. `xml.etree.ElementTree.attrib` 的值永遠是 `str`
+`pages.yml` 的 `Generate coverage badge` step 原本寫：
+```python
+print(f'{root.attrib["line-rate"]*100:.1f}')
+```
+會炸 `ValueError: Unknown format code 'f' for object of type 'str'` — 因為 `ET.parse(...).getroot().attrib["..."]` 是字串，f-string 算術前要 `float()` cast：
+```python
+print(f'{float(root.attrib["line-rate"])*100:.1f}')
+```
+同樣陷阱在 `Element.text` / `tail` / 其他 attrib。**驗證後再 commit**：
+```python
+# local check before pushing
+import xml.etree.ElementTree as ET
+r = ET.parse('coverage.xml').getroot()
+print(type(r.attrib['line-rate']))  # 應該是 float 才是對的；不是就 cast
+```
+實際上 `coverage.xml` schema 的 `line-rate` 是百分比小數（0.0-1.0）不是字串 — 但 `ET.parse` 不會自動轉型。
+
+### 25. `actions/deploy-pages@v4` 只認 artifact name `github-pages`
+`actions/upload-pages-artifact@v3` 的 `with.name` 預設是 `github-pages`，但很容易自訂成 `coverage-report` 之類語意化名字 — 然後 `actions/deploy-pages@v4` 找不到 artifact 就報：
+```
+Error: No artifacts named "github-pages" were found for this workflow run.
+```
+**預防**：
+- `upload-pages-artifact` 的 `name` 永遠寫 `github-pages`（或與 `deploy-pages` 對應）
+- 不要自訂 artifact name — Pages workflow 只有 1 個 artifact，語意化名沒意義
+- 第一次 deploy 前先看 GitHub repo → Actions → Pages workflow run → Artifacts tab，確認有 `github-pages` artifact
+
+**驗證**：v1.6.1 commit `b1d6c77` 把 `coverage-report` 改回 `github-pages` 後，Deploy to GitHub Pages 從 6s 失敗變 6s ✅。
+
+### 26. Multi-job workflow 每個 job 都要自己裝完整 deps
+`test.yml` 有兩個會跑測試的 job：`test`（pytest 矩陣）和 `coverage`（Coverage report）。原本 `coverage` job 只裝 `pytest-cov`，結果 `tests/test_integration.py` 和 `tests/test_verifier.py` import `requests`（透過 `llm_planner.py` / `adversarial_verifier.py`），整個 job `ModuleNotFoundError` 失敗。`pip cache` 不會跨 job 共享 venv 內容（只 cache wheel 下載，不 restore site-packages）。
+
+**預防**：
+- 抽出 install 步驟成 composite action（`.github/actions/setup-deps/action.yml`），所有 job 共用
+- 或在每個跑測試的 job 都 `pip install -r requirements-dev.txt`（冗餘但直觀）
+- 如果想省時間：把 wheel cache key 設對（`cache: 'pip'` + `cache-dependency-path: requirements*.txt`），但**不能省 pip install** 本身
+
+**驗證**：v1.6.1 commit `b1d6c77` 把 coverage job 改成跟 test job 一樣的 `if [ -f requirements.txt ]; then pip install -r ...` 雙行邏輯後，全綠。
 
 ## 檔案結構
 
@@ -521,6 +583,7 @@ dynamic-harness/
 
 | 日期 | 版本 | 變更 |
 |------|------|------|
+| 2026-06-05 | 1.6.1 | CI 全綠（Tests + Pages）、修 6 個 lint 問題、Pitfall 22-26（mandoc strict、.PP after .SS、shellcheck SC2086、ET attrib string、deploy-pages artifact name、多 job 各自裝 deps） |
 | 2026-06-05 | 1.6.0 | 獨立 skill、bin/dh wrapper、scripts/install.sh、Plan UI、Makefile (22 targets)、GitHub Pages coverage deploy、README badges、Pitfall 21（bin/dh 才有 --version） |
 | 2026-06-05 | 1.5.2 | + P4-5 Plan UI：17/17 ✅、99/99 總計、Pitfall 16-20（schema 欄位名、`plan_phases` 主鍵、sub-process env var、pytest 8+ warning、test count 驗證） |
 | 2026-06-05 | 1.5.0 | + metrics、cost tracking、預算警告 CLI |
