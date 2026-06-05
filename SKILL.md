@@ -21,6 +21,9 @@ version: 1.6.0
 | **scripts/test-all.sh** | 一鍵跑完整測試套件 |
 | **Plan UI** | DAG 終端視覺化（`--ui` / `--ui-list` / `--live`） |
 | **category 變更** | `hermes-agent` → `tooling`（頂層分類） |
+| **Makefile** | 22 個 target（test/coverage/lint/ci/install/demo）— 統一入口取代散落的 shell 指令 |
+| **GitHub Pages** | `.github/workflows/pages.yml` 自動部署 coverage HTML 到 `gh-pages`（badge 動態計算） |
+| **README badges** | Tests / Coverage / Python / License 四個 shields.io badge |
 
 ## v1.5 新功能（已保留）
 
@@ -93,6 +96,48 @@ print(metrics.get_summary())
 print(cost.get_cost_summary())
 print(cost.check_budget(budget_usd=5.0))
 ```
+
+## Common Tasks（Makefile 快捷）
+
+v1.6+ 所有常用指令統一透過 `make <target>` 入口。Makefile 在 `$DH/Makefile`，先 `cd $DH` 再執行。
+
+```bash
+cd ~/.hermes/skills/dynamic-harness
+
+# === 開發日常 ===
+make help                 # 列出 22 個 target 與說明
+make test                 # 跑全部 99 個測試（簡短輸出）
+make test-verbose         # 顯示每個測試名稱 + 耗時（找慢測試用）
+make test-fast            # 跳過 test_llm_planner.py，60s → 15s
+make test-one T=tests/test_plan.py::test_parallel_threshold   # 跑單一測試
+
+# === Coverage ===
+make coverage             # 跑測試 + 產生 htmlcov/index.html
+make coverage-clean       # 刪除 coverage artifacts
+
+# === Lint / 健康檢查 ===
+make lint                 # pyflakes + shellcheck + mandoc + bash -n + YAML 全部跑
+make smoke                # CLI 健康檢查（--version / --list-adapters / --ui-list）
+make smoke-dh             # 測試 ~/.local/bin/dh 是否可運作
+
+# === CI 模擬 ===
+make ci                   # 一次跑 test + lint + smoke（= GitHub Actions 在本地跑）
+
+# === 安裝 / 反安裝 ===
+make install              # bash scripts/install.sh（建 ~/.local/bin/dh + man page）
+make man                  # 僅裝 man page
+make uninstall            # 移除 ~/.local/bin/dh symlink
+
+# === Demo ===
+make demo                 # 跑真實任務：分析 01810 小米
+make demo-ui              # 列出所有 plan（demo Plan UI）
+make stats                # 顯示檔案數 / 行數 / 磁碟大小
+```
+
+**為什麼用 Makefile 而非直接打 pytest/shellcheck？**
+- 22 個常用指令一個入口，不需要記 flags
+- `make ci` = 模擬 GitHub Actions 流程，本地先綠再 push
+- `make help` 自動從註解產生，永遠是最新的
 
 ## Metrics 設計
 
@@ -419,6 +464,14 @@ P4-5 commit 前 SKILL.md 寫「85/85 ✅」，但實際 `pytest tests/ -q` 是 *
 - 兩個數字對得起來才寫進文件
 - 同步更新 `[tool.pytest]` 之外的任何表格（檔案結構、變更歷史、測試場景清單）
 
+### 21. Makefile smoke target 必須呼叫 `bin/dh` wrapper，不能直接 `python3 unified_router.py --version`
+v1.6 Makefile 初版 `make smoke` 寫了 `$(PYTHON) unified_router.py --version`，但 argparse 沒有 `--version`，argparse 會直接 exit 2。**修正**：
+- `unified_router.py` 的 argparse spec **沒有註冊 `--version`**。`--version` 是 `bin/dh` 這個 shell wrapper 從 `SKILL.md` 第一行 `# Dynamic Harness v1.6` 抽出來回應的
+- 任何 Makefile target / smoke test / CI 腳本要驗版本，**必須呼叫 `./bin/dh --version`**，不能 `python3 unified_router.py --version`
+- 推論：以後新增 CLI flags 時，**只有真正寫進 argparse 才算「公開 API」**；shell wrapper 處理的（如 `--version`）要在 SKILL.md 註明，否則 smoke/lint 會誤判
+
+**驗證**：`make smoke` 第一行應該輸出 `→ version (via bin/dh wrapper)` + `1.6.0`，不是 `unrecognized arguments: --version`。
+
 ## 檔案結構
 
 ```
@@ -468,6 +521,7 @@ dynamic-harness/
 
 | 日期 | 版本 | 變更 |
 |------|------|------|
+| 2026-06-05 | 1.6.0 | 獨立 skill、bin/dh wrapper、scripts/install.sh、Plan UI、Makefile (22 targets)、GitHub Pages coverage deploy、README badges、Pitfall 21（bin/dh 才有 --version） |
 | 2026-06-05 | 1.5.2 | + P4-5 Plan UI：17/17 ✅、99/99 總計、Pitfall 16-20（schema 欄位名、`plan_phases` 主鍵、sub-process env var、pytest 8+ warning、test count 驗證） |
 | 2026-06-05 | 1.5.0 | + metrics、cost tracking、預算警告 CLI |
 | 2026-06-05 | 1.5.1 | + P3-3 plan-in-code: AdversarialVerifier (12/12)、TemplateLibrary (15/15)、5 starter templates |

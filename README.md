@@ -1,5 +1,10 @@
 # Dynamic Harness
 
+[![Tests](https://github.com/adrian/dynamic-harness/actions/workflows/test.yml/badge.svg)](https://github.com/adrian/dynamic-harness/actions/workflows/test.yml)
+[![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://adrian.github.io/dynamic-harness/landing.html)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 > 統一任務路由器 — 跨 5 個 domain 的 meta-dispatcher，production-ready with full observability。
 
 **獨立 skill**（不再依附 `hermes-agent`）— v1.6.0 / 2026-06-05
