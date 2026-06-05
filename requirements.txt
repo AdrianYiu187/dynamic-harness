@@ -1,0 +1,7 @@
+# Runtime dependencies
+#
+# dynamic-harness has ZERO runtime external dependencies.
+# Everything uses Python 3.9+ standard library.
+#
+# This file exists only to satisfy tooling that expects a requirements.txt.
+# Installing from this file is a no-op.

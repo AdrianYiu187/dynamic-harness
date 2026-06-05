@@ -1,0 +1,142 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+# 允許同一個 PR 內重複觸發
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: pytest (${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-dev.txt
+            pyproject.toml
+
+      - name: Show environment
+        run: |
+          python --version
+          uname -a
+
+      - name: Install dependencies
+        run: |
+          # pytest 是唯一外部依賴；project 是 stdlib-only
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+          fi
+          if [ -f requirements-dev.txt ]; then
+            pip install -r requirements-dev.txt
+          fi
+          # Always install pytest (project 測試必用)
+          pip install pytest
+
+      - name: Run tests
+        run: |
+          python -m pytest tests/ -v --tb=short --durations=10
+
+      - name: Run smoke CLI tests
+        run: |
+          python unified_router.py --version
+          python unified_router.py --list-adapters | head -3
+          python unified_router.py --ui-list
+
+      - name: Validate bin/dh wrapper
+        run: |
+          bash -n bin/dh
+          bash -n scripts/install.sh
+          bash -n scripts/test-all.sh
+
+      - name: Validate man page
+        run: |
+          if command -v mandoc >/dev/null 2>&1; then
+            mandoc -man -Tlint bin/dh.1
+          else
+            echo "mandoc not installed; skipping man page lint"
+          fi
+
+  lint:
+    name: Code quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: pyflakes (syntax-only)
+        run: |
+          pip install pyflakes
+          # 只檢查 project 自己的 .py（跳過 venv/快取）
+          pyflakes *.py adapters/ tests/ || true
+
+      - name: shellcheck (if available)
+        run: |
+          if command -v shellcheck >/dev/null 2>&1; then
+            shellcheck bin/dh scripts/*.sh
+          else
+            sudo apt-get install -y shellcheck || echo "shellcheck unavailable, skipping"
+            shellcheck bin/dh scripts/*.sh || true
+          fi
+
+  coverage:
+    name: Coverage report
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install coverage
+        run: pip install pytest-cov
+
+      - name: Generate coverage
+        run: |
+          python -m pytest tests/ \
+            --cov=. \
+            --cov-report=term-missing:skip-covered \
+            --cov-report=xml:coverage.xml \
+            --cov-report=html:htmlcov \
+            --tb=short
+
+      - name: Upload to Codecov
+        if: success()
+        uses: codecov/codecov-action@v4
+        with:
+          file: coverage.xml
+          fail_ci_if_error: false
+          verbose: true
+
+      - name: Archive HTML report
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: htmlcov/
+          retention-days: 7

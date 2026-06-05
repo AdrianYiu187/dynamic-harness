@@ -1,0 +1,12 @@
+# Development dependencies for dynamic-harness
+#
+# Runtime has ZERO external dependencies (stdlib-only).
+# These are only for testing and CI.
+
+# Core testing
+pytest>=7.0
+pytest-cov>=4.0
+
+# Optional: Web Search adapters (uncomment if used)
+# tavily-python>=0.3.0
+# firecrawl-sdk>=0.0.16

@@ -1,0 +1,218 @@
+.\" Man page for dh (Dynamic Harness)
+.\" Source: ~/.hermes/skills/dynamic-harness/bin/dh.1
+.\" Install: sudo cp bin/dh.1 /usr/local/share/man/man1/ && sudo mandb
+
+.TH DH 1 "2026-06-05" "v1.6.0" "Dynamic Harness Manual"
+
+.SH NAME
+dh \- dynamic-harness unified task router
+
+.SH SYNOPSIS
+.B dh
+[\fIOPTIONS\fR]
+.IR task | ui | ui-list ...
+
+.SH DESCRIPTION
+.B dh
+is a unified task router that dispatches natural\-language tasks to one of
+5 specialized adapters (ft, stock, coding, hermes\-team, general) and
+provides observability (metrics, cost tracking), plan DAG visualization,
+plan\-in\-code execution, envelope cache, and SQLite persistence.
+
+It is a thin wrapper over
+.BR unified_router.py (1)
+in the dynamic\-harness skill.
+
+.SH OPTIONS
+
+.SS Task routing
+.TP
+.B \-\-task \fITEXT\fR, \fB\-t\fR \fITEXT\fR
+Submit a single task. Auto\-detects domain unless \fB\-\-force\-domain\fR is set.
+.TP
+.B \-\-multi\fR, \fB\-m\fR
+Multi\-task mode: auto\-decompose into sub\-tasks and route each independently.
+.TP
+.B \-\-force\-domain \fI{ft,stock,coding,hermes,general}\fR, \fB\-d\fR \fIDOMAIN\fR
+Override domain detection.
+.TP
+.B \-\-parallel \fI{force,auto,never}\fR
+Parallel execution policy (default: auto).
+.TP
+.B \-\-budget \fIUSD\fR
+Reject the task if estimated cost exceeds \fIUSD\fR dollars.
+
+.SS Plan UI (DAG visualization)
+.TP
+.B \-\-ui \fIPLAN_ID\fR
+Render a single plan's DAG to terminal with status colors and timing.
+.TP
+.B \-\-ui\-list
+List all plans in the database.
+.TP
+.B \-\-no\-color
+Disable ANSI color codes (for logs/pipe).
+.TP
+.B \-\-live
+Watch mode: re\-render the plan every \fB\-\-interval\fR seconds until the plan
+reaches a terminal state (completed, failed, cancelled).
+.TP
+.B \-\-interval \fISECS\fR
+Re\-render interval for \fB\-\-live\fR (default: 2.0).
+
+.SS Observability
+.TP
+.B \-\-metrics
+Show adapter usage, cache hit rate, average latency, LLM judge triggers.
+.TP
+.B \-\-cost
+Show current month's API cost breakdown.
+.TP
+.B \-\-cache\-stats
+Show envelope cache hit/miss statistics.
+.TP
+.B \-\-cache\-clear
+Clear the envelope cache.
+.TP
+.B \-\-no\-cache
+Disable envelope cache for this invocation.
+
+.SS Maintenance
+.TP
+.B \-\-list\-adapters
+Print all loaded adapters as JSON.
+.TP
+.B \-\-db\-stats
+Show SQLite database statistics.
+.TP
+.B \-\-cleanup
+Remove old plans per retention policy.
+.TP
+.B \-\-retention\-days \fIN\fR
+Override default retention period (default: 30).
+.TP
+.B \-\-version\fR, \fB\-V\fR
+Print version and exit.
+.TP
+.B \-\-help\fR, \fB\-h\fR
+Print full help (delegated to unified_router.py).
+
+.SH EXAMPLES
+
+.SS Route a stock task
+.PP
+.RS
+.nf
+$ dh \-\-task "分析 01810 小米最近一個月走勢"
+.ft B
+[StockAdapter] confidence=0.92 → result.output: "小米 1 月漲 5.2%..."
+.ft R
+.fi
+.RE
+
+.SS Force domain
+.PP
+.RS
+.nf
+$ dh \-\-task "implement user auth" \-\-force\-domain coding
+.fi
+.RE
+
+.SS Multi-task with budget
+.PP
+.RS
+.nf
+$ dh \-\-task "比較 TSLA vs NVDA 估值" \-\-multi \-\-budget 0.50
+.fi
+.RE
+
+.SS List all plans
+.PP
+.RS
+.nf
+$ dh \-\-ui\-list
+═══════════════════════════════════════════════════════════
+  Plans (3 total)
+═══════════════════════════════════════════════════════════
+  [✓] 2026\-06\-05T21\-15\-30_abc123  ft      4 phases  12.3s
+  [✗] 2026\-06\-05T20\-01\-10_xyz789  stock   3 phases   4.1s
+.fi
+.RE
+
+.SS Watch a plan's progress
+.PP
+.RS
+.nf
+$ dh \-\-ui 2026\-06\-05T21\-15\-30_abc123 \-\-live \-\-interval 1
+.fi
+.RE
+
+.SS Check observability
+.PP
+.RS
+.nf
+$ dh \-\-metrics
+$ dh \-\-cost
+$ dh \-\-budget 5
+.fi
+.RE
+
+.SH ENVIRONMENT
+
+.TP
+.B PLAN_DB_PATH
+Path to the SQLite database storing plans / metrics / costs.
+Default: \fI~/.hermes/plans.db\fR.
+
+.TP
+.B PYTHONPATH
+Prepended with the dynamic\-harness skill directory by the
+.B dh
+wrapper.
+
+.TP
+.B DYNAMIC_HARNESS_BUDGET
+Default USD budget cap (overridable via \fB\-\-budget\fR).
+
+.SH FILES
+
+.TP
+.I ~/.hermes/skills/dynamic-harness/
+Skill installation directory.
+
+.TP
+.I ~/.hermes/plans.db
+SQLite database (plans, phases, metrics, costs, envelope cache).
+
+.TP
+.I ~/.local/bin/dh
+Symlink created by \fBscripts/install.sh\fR.
+
+.SH EXIT STATUS
+
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Generic failure, task error, or plan not found.
+.TP
+.B 2
+Budget exceeded.
+.TP
+.B 130
+SIGINT (Ctrl-C) received.
+
+.SH SEE ALSO
+.BR unified_router.py (1),
+.BR pytest (1),
+.BR sqlite3 (1)
+
+Project home: \fI~/.hermes/skills/dynamic-harness/\fR
+.br
+Full documentation: \fI~/.hermes/skills/dynamic-harness/SKILL.md\fR
+
+.SH AUTHOR
+Adrian <adrian@hermes.local>
+.br
+Generated 2026-06-05 for dynamic-harness v1.6.0.
