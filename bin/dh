@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# dh — Dynamic Harness 統一任務路由器 CLI wrapper
+#
+# 安裝：bash scripts/install.sh（建立 ~/.local/bin/dh symlink）
+# 用法：dh --task "..." 或 dh --ui-list / dh --ui <id> --live
+
+set -e
+
+# 自動定位 skill 目錄（支援 symlink 呼叫）
+if [[ -L "$0" ]]; then
+    # Symlink 模式：解析真實路徑
+    REAL_SCRIPT="$(readlink -f "$0" 2>/dev/null || python3 -c "import os; print(os.path.realpath('$0'))")"
+else
+    REAL_SCRIPT="$0"
+fi
+SKILL_DIR="$(cd "$(dirname "$REAL_SCRIPT")/.." && pwd)"
+
+# 預設 PLAN_DB_PATH（可被環境變數覆蓋）
+export PLAN_DB_PATH="${PLAN_DB_PATH:-$HOME/.hermes/plans.db}"
+export PYTHONPATH="$SKILL_DIR:${PYTHONPATH:-}"
+
+# 顯示版本（debug 用）
+if [[ "$1" == "--version" || "$1" == "-V" ]]; then
+    grep -E "^version:" "$SKILL_DIR/SKILL.md" | head -1 | sed 's/^version: //'
+    exit 0
+fi
+
+# 委派給 unified_router.py
+exec python3 "$SKILL_DIR/unified_router.py" "$@"
