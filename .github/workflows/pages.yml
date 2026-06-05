@@ -78,7 +78,7 @@ jobs:
           COV=$(python -c "
           import xml.etree.ElementTree as ET
           root = ET.parse('coverage.xml').getroot()
-          print(f'{root.attrib[\"line-rate\"]*100:.1f}')
+          print(f'{float(root.attrib[\"line-rate\"])*100:.1f}')
           ")
           echo "COVERAGE=${COV}%" >> $GITHUB_ENV
           echo "Coverage: ${COV}%"
