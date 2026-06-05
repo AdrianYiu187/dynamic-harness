@@ -1,7 +1,7 @@
 # Dynamic Harness
 
-[![Tests](https://github.com/adrian/dynamic-harness/actions/workflows/test.yml/badge.svg)](https://github.com/adrian/dynamic-harness/actions/workflows/test.yml)
-[![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://adrian.github.io/dynamic-harness/landing.html)
+[![Tests](https://github.com/AdrianYiu187/dynamic-harness/actions/workflows/test.yml/badge.svg)](https://github.com/AdrianYiu187/dynamic-harness/actions/workflows/test.yml)
+[![Coverage](https://img.shields.io/badge/coverage-99%25-brightgreen)](https://AdrianYiu187.github.io/dynamic-harness/landing.html)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
