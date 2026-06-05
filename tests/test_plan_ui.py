@@ -30,6 +30,7 @@ import tempfile
 import time
 from pathlib import Path
 from typing import List
+from unittest.mock import patch
 
 _HERE = Path(__file__).resolve().parent
 _DH_ROOT = _HERE.parent
@@ -391,6 +392,49 @@ def test_cli_watch_mode_terminates_on_completed():
 
 
 # ============================================================
+# [P4-5] Regression tests: Plan UI DB path resolution
+# ============================================================
+# 早期版本 _default_db_path() 寫死 skill_dir/plan_registry.db（從未被寫入），
+# 導致 bin/dh --ui / --ui-list 永遠空。修復後 fallback 到 persistence.DEFAULT_DB_PATH。
+
+
+def test_default_db_path_falls_back_to_persistence():
+    """Regression: 沒有 PLAN_DB_PATH 時應 fallback 到 persistence.DEFAULT_DB_PATH"""
+    import plan_ui
+    import persistence
+
+    env_before = os.environ.pop("PLAN_DB_PATH", None)
+    try:
+        assert plan_ui.DEFAULT_DB_PATH is not None, "plan_ui 應匯入 persistence.DEFAULT_DB_PATH"
+        result = plan_ui._default_db_path()
+        assert result == str(persistence.DEFAULT_DB_PATH), (
+            f"_default_db_path()={result} 應等於 persistence.DEFAULT_DB_PATH="
+            f"{persistence.DEFAULT_DB_PATH}"
+        )
+        assert "plan_registry.db" not in result, f"不應再 fallback 到 plan_registry.db，得到 {result}"
+        print("    ✓ fallback 到 persistence.DEFAULT_DB_PATH")
+    finally:
+        if env_before is not None:
+            os.environ["PLAN_DB_PATH"] = env_before
+
+
+def test_default_db_path_respects_env_var():
+    """PLAN_DB_PATH 環境變數應有最高優先權（給 sub-process / 測試用）
+
+    注意：前面的測試透過 setup_temp_db() 把 plan_ui._default_db_path 替換成 lambda，
+    所以這裡要先 reload plan_ui 模組以恢復原始函式，再驗證 env var 優先權。
+    """
+    import importlib
+    import plan_ui
+    importlib.reload(plan_ui)  # 恢復原始 _default_db_path
+
+    with patch.dict(os.environ, {"PLAN_DB_PATH": "/tmp/test_override.db"}, clear=False):
+        result = plan_ui._default_db_path()
+        assert result == "/tmp/test_override.db", f"env var 應優先，得到 {result}"
+        print("    ✓ env var 優先權正確")
+
+
+# ============================================================
 # Main runner
 # ============================================================
 
@@ -413,6 +457,8 @@ def main():
         test_cli_nonexistent_plan_exits_1,
         test_cli_list_empty_db,
         test_cli_watch_mode_terminates_on_completed,
+        test_default_db_path_falls_back_to_persistence,  # P4-5 regression
+        test_default_db_path_respects_env_var,            # P4-5 regression
     ]
     passed, failed = 0, 0
     for t in tests:

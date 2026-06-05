@@ -24,6 +24,12 @@ except ImportError:
     Plan = None  # type: ignore
     Phase = None  # type: ignore
 
+# 嘗試從 persistence.py 匯入 DEFAULT_DB_PATH（與 plan.py 同步用同一個 DB）
+try:
+    from persistence import DEFAULT_DB_PATH
+except ImportError:
+    DEFAULT_DB_PATH = None  # type: ignore
+
 
 # ============================================================
 # 1. 狀態圖示與顏色
@@ -299,11 +305,16 @@ def _default_db_path() -> str:
     
     優先順序：
     1. PLAN_DB_PATH 環境變數（給 sub-process / 測試用）
-    2. skill_dir/plan_registry.db（與 plan.py 同步）
+    2. persistence.DEFAULT_DB_PATH（與 plan.py 同一個 DB，確保 Plan UI 能看到
+       plan_cli.py 寫入的 plans/plan_phases。早期版本寫死 skill_dir/plan_registry.db
+       但該檔案從未被任何程式寫入，導致 --ui / --ui-list 永遠空。P4-5 demo 揭露並修復。）
     """
     env_path = os.environ.get("PLAN_DB_PATH")
     if env_path:
         return env_path
+    if DEFAULT_DB_PATH is not None:
+        return str(DEFAULT_DB_PATH)
+    # Fallback（理論上不會到這層）
     skill_dir = os.path.dirname(os.path.abspath(__file__))
     return os.path.join(skill_dir, "plan_registry.db")
 

@@ -15,8 +15,9 @@ else
 fi
 SKILL_DIR="$(cd "$(dirname "$REAL_SCRIPT")/.." && pwd)"
 
-# 預設 PLAN_DB_PATH（可被環境變數覆蓋）
-export PLAN_DB_PATH="${PLAN_DB_PATH:-$HOME/.hermes/plans.db}"
+# PLAN_DB_PATH 由 plan_ui._default_db_path() 自動 fallback 到 persistence.DEFAULT_DB_PATH
+# 不在這裡覆寫 — 早期版本寫死 $HOME/.hermes/plans.db 但該檔案不存在，
+# 會蓋過 plan_ui 的 fallback 邏輯，導致 --ui / --ui-list 永遠空。P4-5 demo 揭露並修復。
 export PYTHONPATH="$SKILL_DIR:${PYTHONPATH:-}"
 
 # 顯示版本（debug 用）

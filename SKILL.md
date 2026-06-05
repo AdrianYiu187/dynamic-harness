@@ -4,12 +4,12 @@ description: 統一任務路由器 v1.6 — 跨 5 個 domain 的 meta-dispatcher
 category: tooling
 tags: [router, dynamic, harness, dispatcher, ft-team-agent, stock-team-agent, coding-team-agent, llm-judge, multi-route, sqlite, integration, general-fallback, web-search, tavily, firecrawl, retention, cache, production, metrics, cost-tracking, plan-in-code, plan-ui, verifier, template-library, dag-visualization, independent-skill]
 created: 2026-06-05
-version: 1.6.1
+version: 1.6.2
 ---
 
-# Dynamic Harness v1.6.1 — CI 全綠 + 5 個新 pitfall
+# Dynamic Harness v1.6.2 — Plan UI DB path 雙 bug 修復 + Pitfall 30
 
-> 5 個 domain、19 個功能、99/99 測試通過（0 個測試警告）。**已升級為獨立 skill**（不再依附 `hermes-agent`）— 2026-06-05。
+> 5 個 domain、19 個功能、101/101 測試通過（0 個測試警告）。**已升級為獨立 skill**（不再依附 `hermes-agent`）— 2026-06-05。
 
 ## v1.6 — 獨立化 + Plan UI
 
@@ -106,7 +106,7 @@ cd ~/.hermes/skills/dynamic-harness
 
 # === 開發日常 ===
 make help                 # 列出 22 個 target 與說明
-make test                 # 跑全部 99 個測試（簡短輸出）
+make test                 # 跑全部 101 個測試（簡短輸出）
 make test-verbose         # 顯示每個測試名稱 + 耗時（找慢測試用）
 make test-fast            # 跳過 test_llm_planner.py，60s → 15s
 make test-one T=tests/test_plan.py::test_parallel_threshold   # 跑單一測試
@@ -128,10 +128,13 @@ make install              # bash scripts/install.sh（建 ~/.local/bin/dh + man 
 make man                  # 僅裝 man page
 make uninstall            # 移除 ~/.local/bin/dh symlink
 
-# === Demo ===
-make demo                 # 跑真實任務：分析 01810 小米
-make demo-ui              # 列出所有 plan（demo Plan UI）
+### Demo ===
+make demo                 # 跑真實任務：分析 01810 小米（⚠️ adapter 是 router-only，見 Pitfall #29）
+make demo-ui              # 列出所有 plan（demo Plan UI，1.6.2+ 不需 PLAN_DB_PATH）
 make stats                # 顯示檔案數 / 行數 / 磁碟大小
+
+### Plan-in-Code 範本 ===
+* `templates/plan_cli_demo.py` — 4 phases, 多 domain, DAG deps, 已知可 E2E 跑通（generate → execute → Plan UI 渲染）。改 `router.route("...")` 內容即可 reproduce 各種 multi-domain 任務。語法細節見 Pitfall #28。
 ```
 
 **為什麼用 Makefile 而非直接打 pytest/shellcheck？**
@@ -251,7 +254,7 @@ stock_router.py:   c051c6c442d9ae2e (unchanged)
 task_router.py:    c8941a76346d8828 (unchanged)
 ```
 
-## 99/99 測試結果（2026-06-05 實測 84.75s）
+## 101/101 測試結果（2026-06-05 實測 78.53s）
 
 ```
 test_basic.py            18/18 ✅
@@ -259,10 +262,10 @@ test_plan.py             15/15 ✅
 test_integration.py      10/10 ✅
 test_template_library.py 15/15 ✅
 test_verifier.py         12/12 ✅
-test_plan_ui.py          17/17 ✅
+test_plan_ui.py          19/19 ✅ (P4-5: +2 regression tests)
 test_llm_planner.py      12/12 ✅
 ────────────────────────────────────
-總計                     99/99 ✅
+總計                     101/101 ✅
 ```
 
 > 過濾 99 個 `PytestReturnNotNoneWarning`（pytest 8+ 對 `return` 風格測試丟的）見 [`references/test-execution-checklist.md`](references/test-execution-checklist.md)。
@@ -323,7 +326,7 @@ Phase 3 設計已交付（**待用戶確認後進 MVP**）：
 2. **cost 估算為粗略值** — 應根據實際 API 定價調整 `cost.COST_TABLE`
 3. **metrics 永久累積** — 需手動 `clear_metrics()` 或 `--cleanup`
 4. **LLM judge 5/6 正確** — 「小米新聞」會被當 general
-5. **plan-in-code 還沒實作** — 設計完成，MVP 待 P3-2
+5. ~~plan-in-code 還沒實作~~ — **已實作並 E2E 驗證**（P3-3.6 + Plan-in-Code 示範, 2026-06-05）。`python3 plan_cli.py generate --script-file X.py` + `execute --plan-id <id>` 真實跑通：3 phases, 多 domain, DAG deps, 4.9s LLM 二次判斷, SQLite 寫入 8 plans。見 `templates/plan_cli_demo.py` 可直接 reproduce。
 
 ## Pitfalls（從實際建構 v1.5 學到的）
 
@@ -395,7 +398,7 @@ Template trigger regex 用繁體中文，但使用者可能打簡體（`賽` vs 
 | P4-2 | Status 顏色化（ANSI escape codes） | - | ✅ |
 | P4-3 | CLI 整合（`--ui` / `--ui-list` / `--live`） | - | ✅ |
 | P4-4 | `tests/test_plan_ui.py` 整合測試 | **17/17 ✅** | ✅ |
-| P4-5 | SKILL.md 更新 + Pitfall 補充 | - | ✅ |
+| P4-5 | SKILL.md 更新 + Pitfall 補充（後續 1.6.2 補上 +2 regression tests → 19/19） | - | ✅ |
 
 **`tests/test_plan_ui.py` 17 個測試場景**：
 1. `_assign_levels` 無依賴 / 線性 chain / diamond
@@ -414,9 +417,9 @@ Template trigger regex 用繁體中文，但使用者可能打簡體（`賽` vs 
 - `tests/test_integration.py` — 10/10 ✅
 - `tests/test_template_library.py` — 15/15 ✅
 - `tests/test_verifier.py` — 12/12 ✅
-- `tests/test_plan_ui.py` — 17/17 ✅（新）
+- `tests/test_plan_ui.py` — 19/19 ✅（P4-5: +2 regression tests）
 - `tests/test_llm_planner.py` — 12/12 ✅
-- **總計: 99/99 ✅**（無回歸，0 個測試警告）
+- **總計: 101/101 ✅**（無回歸，0 個測試警告）
 
 **Plan UI 設計**：
 - 兩種視圖：DAG 拓樸圖（每行一層 level）+ 分層詳情列表（含 deps、subtask、timing、error）
@@ -534,6 +537,115 @@ Error: No artifacts named "github-pages" were found for this workflow run.
 
 **驗證**：v1.6.1 commit `b1d6c77` 把 coverage job 改成跟 test job 一樣的 `if [ -f requirements.txt ]; then pip install -r ...` 雙行邏輯後，全綠。
 
+### 27. `plan_ui._default_db_path()` 指向不存在的 DB → Plan UI 永遠空（已修復 P4-5）
+**症狀**：`./bin/dh --ui <plan-id>` 永遠回 "Plan X not found in DB"；`./bin/dh --ui-list` 永遠 "No plans found in DB."，即使 `~/.hermes/dynamic_harness_envelopes.db` 裡有 8+ plans。
+
+**原因**（`plan_ui.py:297-308` + `bin/dh:19`，**兩個 bug 疊加**）：
+1. `plan_ui._default_db_path()` 寫死 `skill_dir/plan_registry.db`（從未建立），註解卻說「與 plan.py 同步」
+2. `bin/dh:19` 又覆寫 `export PLAN_DB_PATH="${PLAN_DB_PATH:-$HOME/.hermes/plans.db}"`（也不存在），蓋過 #1 的 fallback
+
+**修法**（P4-5 一起修，2026-06-05）：
+- `plan_ui.py:27-29`：新增 `from persistence import DEFAULT_DB_PATH`
+- `plan_ui.py:308`：fallback chain 改為 `PLAN_DB_PATH env → persistence.DEFAULT_DB_PATH → 舊路徑 (defensive)`
+- `bin/dh:19`：刪掉 `export PLAN_DB_PATH=...`，改由 `plan_ui._default_db_path()` 自己 fallback
+
+**驗證**（修後）：
+```bash
+unset PLAN_DB_PATH
+./bin/dh --ui-list                       # → 8 recent plans
+./bin/dh --ui <plan-id>                  # → DAG view + phase details
+PLAN_DB_PATH=/tmp/x.db ./bin/dh --ui-list # → env var 仍可覆寫（sub-process / 測試用）
+```
+
+**Regression tests**（`tests/test_plan_ui.py`，+2 tests, 99→101）：
+- `test_default_db_path_falls_back_to_persistence` — 無 env 時 fallback 到 `persistence.DEFAULT_DB_PATH`
+- `test_default_db_path_respects_env_var` — env var 優先權
+
+**教訓**：跨模組共享 DB 時，**`from persistence import DEFAULT_DB_PATH`** 是 single source of truth。不要在 `bin/` wrapper 裡再覆寫一次（會把 `plan_ui` 的 fallback 邏輯蓋掉）。
+
+### 28. `parse_script_to_plan` 的 script 語法是 `router.route(...)` + 注釋，不是函式呼叫
+**症狀**：寫 `phase('id', 'domain', 'task')` 或 `p1 = router.route("task")` 然後以為會被 parser 自動 group 成 phases，結果 `phase_count: 0`，plan 永遠 `validated` 但沒有 phases。
+
+**正確語法**（`plan.py:420-498` 的 `parse_script_to_plan` 是 regex-based parser）：
+- 找 `router.route("sub_task")` 呼叫 → 每個視為一個 phase
+- 注釋**直接放在呼叫上方**推導屬性：
+  - `# domain: stock|ft|coding|hermes|general` ← 設 force_domain
+  - `# depends_on: [1, 2, 3]` ← 設依賴（**唯一寫法，沒有 kwarg**）
+  - `# name: short label` ← phase name
+  - `# timeout: 60` ← 預設 60s
+  - `# parallel: True` ← 平行執行（注意：偵測 `"parallel" in c.lower() and "true" in c.lower()`，兩個字都要在注釋裡）
+- `force_domain="X"` 作為 kwarg 是 **fallback**，只在沒 `# domain:` 注釋時用
+- `depends_on` 沒有 kwarg 形式 — 必須靠注釋
+
+**錯的寫法**：
+```python
+phase('p1', 'stock', '分析 01810')  # ← phase() 函式不存在
+p1 = router.route("分析 01810")       # ← 沒注釋，depends_on 抓不到
+```
+
+**對的寫法**：
+```python
+# domain: stock
+# name: 小米分析
+router.route("分析 01810 小米", force_domain="stock")
+
+# domain: general
+# depends_on: [1]
+# name: 總結
+router.route("總結結果", force_domain="general")
+```
+
+**完整可 reproduce 範本**見 `templates/plan_cli_demo.py`。
+
+**驗證**：`plan_cli.py generate --script-file X.py` 應回 `phase_count: N`（N = 你的 `router.route` 數量），不是 0。
+
+### 29. 5 個 adapter 都是 router-only，不會真的執行分析
+**症狀**：`make demo` 跑 `python3 unified_router.py --task "分析 01810 小米最近一個月走勢" --force-domain stock` 只回 routing metadata（`detected_domain`、`domain_confidence`、`adapter_used`），沒有實際股票分析結果。plan 執行後 `envelope_id: null` 是正常的，不是 bug。
+
+**原因**：StockAdapter / FTAdapter / CodingAdapter / HermesTeamAdapter / GeneralAdapter **只做 domain 偵測 + 關鍵字 matching + LLM 二次判斷**，回傳 `RouteEnvelope`。實際分析由各自的 team-agent skill 負責（`ft-team-agent` / `stock-team-agent` / `coding-team-agent`），Dynamic Harness **不會**自動 invoke。
+
+**正確用法**：
+- 想要 routing decision：用 `dh --task "..."`（≤ 0.5s 回傳）
+- 想要真實分析：直接 invoke 對應的 team-agent：
+  ```bash
+  python3 ~/.hermes/skills/stock-team-agent/...      # 股票
+  python3 ~/.hermes/skills/ft-team-agent/task_router_v2.py ...   # 足球
+  ```
+- 想要多 domain 流程 + DAG + Plan UI：用 `plan_cli.py` 串接（`parse_script_to_plan` + `PlanExecutor`），見 Pitfall #28 + `templates/plan_cli_demo.py`
+
+**例外**：`GeneralAdapter` 在 LLM judge 觸發時（confidence < 1.0）會 call LLM API ~5s，但仍只是做 domain 判斷 + Web Search 摘要，不是 end-to-end 任務執行。
+
+**驗證**：`make demo` 跑完看 `envelope_id` — 應為 `null`（不是 envelope 物件），這是正常行為。
+
+### 30. `bin/dh` 二次覆寫 `PLAN_DB_PATH` 蓋過 `plan_ui` 的 fallback 邏輯（已修復 P4-5）
+**症狀**：即使修了 `plan_ui._default_db_path()` fallback 到 `persistence.DEFAULT_DB_PATH`（Pitfall #27），裸跑 `./bin/dh --ui-list` 還是 "No plans found in DB."。手動設 `PLAN_DB_PATH=...` 才看得到 plans。
+
+**原因**（`bin/dh:19`，**v1.6.0 獨立 skill 時新加的 wrapper**）：
+```bash
+export PLAN_DB_PATH="${PLAN_DB_PATH:-$HOME/.hermes/plans.db}"   # ← 第三個錯的路徑
+```
+這個 fallback 預設值是 `$HOME/.hermes/plans.db`（**第四個不存在的路徑**），會在 `plan_ui` 之前就把 env 設成錯的。Layered bugs 鏈：
+1. `bin/dh:19` → 設 `PLAN_DB_PATH=$HOME/.hermes/plans.db`（不存在）
+2. `plan_ui.py:308` → 看到 `PLAN_DB_PATH` 就 return → fallback chain 永遠不走
+
+**為什麼 unit test 沒抓到**：`tests/test_plan_ui.py` 的 `setup_temp_db()` 直接 monkey-patch `plan_ui._default_db_path`，完全 bypass bin/dh。CLI-level integration test 才能抓到。
+
+**修法**（P4-5 修，2026-06-05）：**bin wrapper 不應該有 fallback**。讓 `plan_ui._default_db_path()` 自己負責 chain：
+```bash
+# bin/dh:19 — 刪掉這行
+# export PLAN_DB_PATH="${PLAN_DB_PATH:-$HOME/.hermes/plans.db}"
+export PYTHONPATH="$SKILL_DIR:${PYTHONPATH:-}"
+```
+
+**驗證**（修後）：
+```bash
+unset PLAN_DB_PATH
+./bin/dh --ui-list        # 應顯示 8 plans（不需手動設 env）
+./bin/dh --ui <plan-id>   # 應顯示 DAG + phase details
+```
+
+**教訓**：**bin/wrapper 應該只做 env setup，不該做業務邏輯的 default**。Default value 的 single source of truth 應該在最靠近使用方的模組（這裡是 `plan_ui._default_db_path()`）。如果 wrapper 加了 fallback，要嘛寫對（用 `persistence.DEFAULT_DB_PATH`），要嘛乾脆不要加。
+
 ## 檔案結構
 
 ```
@@ -569,7 +681,7 @@ dynamic-harness/
 ├── scripts/
 │   ├── verify_unchanged.py
 │   └── discover_router_api.py
-└── tests/                  ⭐v1.5.2 (99 tests total, 0 warnings)
+└── tests/                  ⭐v1.6.2 (101 tests total, 0 warnings)
     ├── test_basic.py           18 tests
     ├── test_plan.py            15 tests (PlanExecutor)
     ├── test_llm_planner.py     12 tests
@@ -583,7 +695,7 @@ dynamic-harness/
 
 | 日期 | 版本 | 變更 |
 |------|------|------|
-| 2026-06-05 | 1.6.1 | CI 全綠（Tests + Pages）、修 6 個 lint 問題、Pitfall 22-26（mandoc strict、.PP after .SS、shellcheck SC2086、ET attrib string、deploy-pages artifact name、多 job 各自裝 deps） |
+| 2026-06-05 | 1.6.2 | Plan UI DB path 雙 bug 修復：plan_ui._default_db_path() fallback 到 persistence.DEFAULT_DB_PATH（不再是 skill_dir/plan_registry.db）+ bin/dh 移除 PLAN_DB_PATH 二次覆寫 + 2 個 regression tests（99→101）+ Pitfall 30 |
 | 2026-06-05 | 1.6.0 | 獨立 skill、bin/dh wrapper、scripts/install.sh、Plan UI、Makefile (22 targets)、GitHub Pages coverage deploy、README badges、Pitfall 21（bin/dh 才有 --version） |
 | 2026-06-05 | 1.5.2 | + P4-5 Plan UI：17/17 ✅、99/99 總計、Pitfall 16-20（schema 欄位名、`plan_phases` 主鍵、sub-process env var、pytest 8+ warning、test count 驗證） |
 | 2026-06-05 | 1.5.0 | + metrics、cost tracking、預算警告 CLI |
