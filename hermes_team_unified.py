@@ -49,15 +49,26 @@ log = logging.getLogger("hermes_team_unified")
 # === 載入 HermesTeamAgent TaskRouter（不執行其 main）===
 
 def _load_hta_router():
-    """動態載入 HermesTeamAgent 的 task_router.py 並取 TaskRouter class"""
+    """動態載入 HermesTeamAgent 的 task_router.py 並取 TaskRouter class
+
+    找不到時 graceful degrade，回傳 (None, None) — 整合路由器仍可運作
+    （HTA 是 optional 增強，沒有它也能 fallback 到 Dynamic Harness）
+    """
     import importlib.util
-    spec = importlib.util.spec_from_file_location("hta_task_router", str(HTA_ROUTER_PATH))
-    if spec is None or spec.loader is None:
+    if not HTA_ROUTER_PATH.exists():
+        log.info("HTA TaskRouter not found at %s — running without it", HTA_ROUTER_PATH)
         return None, None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["hta_task_router"] = module
-    spec.loader.exec_module(module)
-    return module.TaskRouter, module.TASK_PROFILES
+    try:
+        spec = importlib.util.spec_from_file_location("hta_task_router", str(HTA_ROUTER_PATH))
+        if spec is None or spec.loader is None:
+            return None, None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["hta_task_router"] = module
+        spec.loader.exec_module(module)
+        return module.TaskRouter, module.TASK_PROFILES
+    except (FileNotFoundError, ImportError, AttributeError) as e:
+        log.warning("Failed to load HTA TaskRouter: %s — running without it", e)
+        return None, None
 
 
 # === 整合路由器 ===

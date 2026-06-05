@@ -88,11 +88,19 @@ class Verdict:
 
 class AdversarialVerifier:
     """對 plan 做獨立審核"""
-    
+
     def __init__(self, config: Optional[VerifierConfig] = None):
         self.config = config or VerifierConfig()
         if not self.config.api_key:
-            raise RuntimeError("MINIMAX_API_KEY not found")
+            # Lazy check: verifier 可以在沒有 API key 時建立
+            # - offline_only=True 的 verify() 不會打到 LLM
+            # - offline_only=False 時 _llm_verify() 才會 raise
+            # 這樣 CI 沒設 MINIMAX_API_KEY 也能跑 static check 測試
+            import logging as _log
+            _log.getLogger(__name__).warning(
+                "MINIMAX_API_KEY not found — verifier will work offline-only. "
+                "Set MINIMAX_API_KEY in env to enable LLM semantic checks."
+            )
     
     def verify(
         self,
