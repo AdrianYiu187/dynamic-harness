@@ -676,7 +676,8 @@ dynamic-harness/
 │   ├── m2-7-thinking-parser.md
 │   ├── hermes-task-routers-inventory.md
 │   └── tavily-firecrawl-quirks.md
-├── templates/
+├── templates/              ⭐v1.6.2 (+plan_cli_demo.py)
+│   ├── plan_cli_demo.py         50 lines, E2E-verified multi-domain plan
 │   └── new_domain_adapter_template.py
 ├── scripts/
 │   ├── verify_unchanged.py
