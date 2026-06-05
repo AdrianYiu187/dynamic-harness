@@ -3,3 +3,14 @@ __pycache__/
 *.pyc
 *.db
 .DS_Store
+
+# Testing / coverage artifacts
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.egg-info/
+.tox/
+.mypy_cache/
+.ruff_cache/
