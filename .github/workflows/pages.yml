@@ -36,11 +36,6 @@ permissions:
   pages: write
   id-token: write
 
-# 不要讓舊部署無限期保留
-environment:
-  name: github-pages
-  url: ${{ steps.deployment.outputs.page_url }}
-
 jobs:
   # ============================================================
   # Job 1: 跑測試 + 產生 coverage HTML
@@ -189,6 +184,9 @@ jobs:
     name: Deploy to GitHub Pages
     needs: build
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Deploy to GitHub Pages
