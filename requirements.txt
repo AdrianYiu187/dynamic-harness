@@ -1,7 +1,15 @@
 # Runtime dependencies
 #
-# dynamic-harness has ZERO runtime external dependencies.
-# Everything uses Python 3.9+ standard library.
+# dynamic-harness has only ONE runtime external dependency: `requests`.
+# Everything else uses Python 3.9+ standard library.
 #
-# This file exists only to satisfy tooling that expects a requirements.txt.
-# Installing from this file is a no-op.
+# 為什麼需要 requests？
+#   - llm_planner.py：呼叫 MiniMax API（plan 生成）
+#   - adversarial_verifier.py：呼叫 MiniMax API（adversarial 評估）
+#   - 兩者都使用 OpenAI-compatible chat completions endpoint
+#
+# 替代方案：使用 stdlib 的 urllib.request（見 llm_judge.py）
+#   - 但需要手動處理 JSON、headers、timeout
+#   - 為了可讀性，外部 API call 統一用 requests
+
+requests>=2.28.0

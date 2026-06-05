@@ -1,11 +1,13 @@
 # Development dependencies for dynamic-harness
 #
-# Runtime has ZERO external dependencies (stdlib-only).
-# These are only for testing and CI.
+# These are only for testing, CI, and local dev. Runtime deps are in requirements.txt.
 
 # Core testing
 pytest>=7.0
 pytest-cov>=4.0
+
+# Runtime deps (needed for collecting test modules that import from project code)
+-r requirements.txt
 
 # Optional: Web Search adapters (uncomment if used)
 # tavily-python>=0.3.0

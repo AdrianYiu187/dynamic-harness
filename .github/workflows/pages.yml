@@ -57,10 +57,8 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pytest pytest-cov
-          # 如果有 requirements.txt，順便裝（容錯）
-          pip install -r requirements.txt 2>/dev/null || true
-          pip install -r requirements-dev.txt 2>/dev/null || true
+          pip install -r requirements-dev.txt
+          # pytest + pytest-cov 已在 requirements-dev.txt 裡
 
       - name: Run tests with coverage
         run: |
