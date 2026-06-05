@@ -61,7 +61,8 @@ jobs:
 
       - name: Run smoke CLI tests
         run: |
-          python unified_router.py --version
+          # --version 是 bin/dh wrapper 處理的；unified_router.py 沒有原生 flag
+          ./bin/dh --version
           python unified_router.py --list-adapters | head -3
           python unified_router.py --ui-list
 
