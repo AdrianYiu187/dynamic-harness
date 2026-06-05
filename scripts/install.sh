@@ -54,7 +54,7 @@ if [[ -f "$SKILL_DIR/bin/dh.1" ]] && command -v mandoc >/dev/null 2>&1; then
     mkdir -p "$MANDIR"
     cp "$SKILL_DIR/bin/dh.1" "$MANDIR/dh.1"
     echo "✓ Man page installed: $MANDIR/dh.1"
-    if [[ ":MANPATH:" != *":$(dirname $MANDIR):"* ]]; then
+    if [[ ":MANPATH:" != *":$(dirname "$MANDIR"):"* ]]; then
         echo "  To view: man dh  (after adding ~/.local/share/man to MANPATH)"
         echo "  Or:     mandoc -man $SKILL_DIR/bin/dh.1 | less"
     fi
